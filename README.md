@@ -1,4 +1,12 @@
+![mit](https://img.shields.io/badge/License-MIT-blue.svg)
 
+# Confidence in absence as confidence in counterfactual visibility
+
+Maya Schipper & Matan Mazor 
+
+<img src="analysis/figures/design1.png" alt="Rationale and experimental design for Experiment 1" width="500"/>
+
+A series of experiments looking at the effects of factual and counterfactual visibility on confidence in presence and absence. 
 
 ## Data
 
