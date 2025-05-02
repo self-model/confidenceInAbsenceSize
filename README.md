@@ -10,5 +10,5 @@ Data from Exp. 1, including raw behavioural data, parameter estimates and simula
 
 Raw behavioural data from Exp. 2 is also available [on OSF](https://osf.io/fhn7v/files/osfstorage).
 
-
+These files can be downloaded into their right places by running [`downloadFromOSF.R`](https://github.com/self-model/confidenceInAbsenceSize/blob/main/analysis/downloadFromOSF.R) from the analysis subdirectory.
 
