@@ -1,6 +1,6 @@
 ---
-title: "Exp. 1: pre-registered results"
-shorttitle: "Exp. 1: pre-registered results"
+title: "Exp. 2: pre-registered results"
+shorttitle: "Exp. 2: pre-registered results"
 
 author: 
   - name: "Maya Schipper"
@@ -39,15 +39,11 @@ library('groundhog')
 groundhog.library(
   c(
     'papaja',
+    'osfr',
     'tidyverse',
-    'BayesFactor',# for Bayesian t test
-    'ggrepel', # for geom_label_repel
-    'lmerTest',
-    'osfr'
+    'psych'
   ), "2024-12-01"
 )
-
-r_refs("r-references.bib")
 
 knitr::opts_chunk$set(warning=F,echo=F,message=F,cache=T)
 
@@ -57,22 +53,18 @@ knitr::opts_chunk$set(warning=F,echo=F,message=F,cache=T)
 
 source("../analysis/downloadFromOSF.R")
 source("../analysis/loadAndPreprocessData.R")
-size.df <- size.df %>% filter(
-  test_part %in% c('test1','test2')
-)
-
 ```
 
 ### Participants
 
-`r size.raw_df$subj_id%>%unique()%>%length()` participants took part in the letter-detection task. Participants were excluded if their accuracy fell below 50% (0 participants). We also excluded participants if they had extremely fast (`r size.too_fast%>%length()` participants) or slow (`r size.too_fast%>%length()` participants) reaction times in this task (below 100 milliseconds or above 7 seconds in more than 25% of the trials). Trials with reaction times below 100 milliseconds (`r (size.raw_df%>%filter(RT<100)%>%nrow()/size.raw_df%>%filter(RT>0)%>%nrow())%>%printnum()` of all trials) or above 7 seconds (`r (size.raw_df%>%filter(RT>7000)%>%nrow()/size.raw_df%>%filter(RT>0)%>%nrow())%>%printnum()` of all trials) were excluded from the reaction time analysis.
+`r prospective.raw$subj_id%>%unique()%>%length()` participants took part in the letter-detection task. Participants were excluded if their accuracy fell below 50% (0 participants). We also excluded participants if they had extremely fast (`r prospective.too_fast%>%length()` participants) or slow (`r prospective.too_fast%>%length()` participants) reaction times in this task (below 100 milliseconds or above 7 seconds in more than 25% of the trials). Trials with reaction times below 100 milliseconds (`r (prospective.raw%>%filter(RT<100)%>%nrow()/prospective.raw%>%filter(RT>0)%>%nrow())%>%printnum()` of all trials) or above 7 seconds (`r (prospective.raw%>%filter(RT>7000)%>%nrow()/prospective.raw%>%filter(RT>0)%>%nrow())%>%printnum()` of all trials) were excluded from the reaction time analysis.
 
 ### Hypotheses
 
 This study is designed to test whether expected visibility impacts participants’ decisions about presence and absence.
 
 ```{r H1, echo=FALSE, cache=TRUE}
-response_RT <- size.df %>%
+response_RT <- prospective.df %>%
     dplyr::filter(RT > 100 & RT < 7000 & correct == TRUE) %>%  
     dplyr::group_by(subj_id, resp) %>%
     dplyr::summarise(RT = median(RT)) %>%
@@ -87,7 +79,7 @@ We performed paired t-test on the following individual-level contrast from corre
 This revealed a significant difference in response times for target-present and target-absent responses (`r apa_print(response_RT%>%pull(response_RT)%>%t.test())$full_result`), with overall slower response times for decisions about absence.
 
 ```{r H2, echo=FALSE, cache=TRUE}
-RT_size_present <- size.df %>%
+RT_size_present <- prospective.df %>%
     dplyr::filter(RT > 100 & RT < 7000 & present == 1 & correct == TRUE) %>%
     dplyr::group_by(subj_id, size) %>%
     dplyr::summarise(RT = median(RT))%>%
@@ -102,7 +94,7 @@ We performed a paired t-test on the following individual-level contrast from cor
 This revealed a significant difference in response times between big and small stimuli in target-present decisions (`r apa_print(RT_size_present%>%pull(RT_size_present)%>%t.test())$full_result`), with slower response times for big stimuli.
 
 ```{r H3, echo=FALSE, cache=TRUE}
-RT_size_absent <- size.df %>%
+RT_size_absent <- prospective.df %>%
     dplyr::filter(RT > 100 & RT < 7000 & present == 0 & correct == TRUE) %>%
     dplyr::group_by(subj_id, size) %>%
     dplyr::summarise(RT = median(RT))%>%
@@ -128,10 +120,10 @@ RT_size_resp <- inner_join(
 
 We performed a group-level t-test on a subject-level contrast in correct trials only: $(median({RT}_{P,small})-median({RT}_{P,big}))-(median({RT}_{A,small}) - median({RT}_{A,big}))$ where P and A stand for present and absent respectively.
 
-This revealed a significant interaction between stimulus size and target presence (`r apa_print(RT_size_resp%>%pull(RT_size_resp)%>%t.test())$full_result`).
+This revealed a non-significant interaction between stimulus size and target presence (`r apa_print(RT_size_resp%>%pull(RT_size_resp)%>%t.test())$full_result`).
 
 ```{r H5, echo=FALSE, cache=TRUE}
-accuracy_size <- size.df %>%
+accuracy_size <- prospective.df %>%
   dplyr::group_by(subj_id, size) %>%
   dplyr::summarise(
     hit_rate =(sum(correct & present)+0.5)/(sum(present)+1),
@@ -165,45 +157,45 @@ We performed a paired t-test on the following subject-level contrast: $c_{big} -
 We found a significantly more conservative criterion for big stimuli (`r apa_print(criterion%>%pull(criterion_size)%>%t.test())$full_result`).
 
 ```{r H7, echo=FALSE, cache=TRUE}
-response_confidence <- size.df %>%
-    dplyr::filter(correct == TRUE) %>%
+response_confidence <- prospective.df %>%
+    dplyr::filter(correct == TRUE & confidence_time == "after") %>%
     dplyr::group_by(subj_id, resp) %>%
     dplyr::summarise(confidence=mean(confidence)) %>%
     tidyr::pivot_wider(names_from = resp, values_from = confidence) %>%
     dplyr::mutate(response_confidence = `TRUE` - `FALSE`)
 ```
 
-*Hypothesis 7 (PRESENCE/ABSENCE CONFIDENCE RATINGS)*: We tested the null hypothesis that confidence ratings are similar for target-present and target-absent responses, aiming to replicate the finding that subjective confidence levels are lower for decisions about absence than decisions about presence [@mazor2021].
+*Hypothesis 7 (PRESENCE/ABSENCE CONFIDENCE RATINGS)*: We tested the null hypothesis that post-decisional confidence ratings are similar for target-present and target-absent responses, aiming to replicate the finding that subjective confidence levels are lower for decisions about absence than decisions about presence [@mazor2021].
 
 We performed a paired t-test on the the following subject-level contrast from correct trials: $mean(confidence_{present}) - mean(confidence_{absent})$
 
 This revealed a significant difference in confidence ratings for decisions about presence and absence (`r apa_print(response_confidence%>%pull(response_confidence)%>%t.test())$full_result`), with higher confidence ratings for present responses.
 
 ```{r H8, echo=FALSE, cache=TRUE}
-conf_size_present <- size.df %>%
-    dplyr::filter(present == 1 & correct == TRUE) %>%
+conf_size_present <- prospective.df %>%
+    dplyr::filter(present == 1 & correct == TRUE & confidence_time == "after") %>%
     dplyr::group_by(subj_id, size) %>%
     dplyr::summarise(confidence = mean(confidence)) %>%
     tidyr::pivot_wider(names_from = size, values_from = confidence) %>%
     dplyr::mutate(conf_size_present = big-small)
 ```
 
-*Hypothesis 8 (SIZE EFFECT ON CONFIDENCE IN PRESENCE)*: We tested the null hypothesis that target-present confidence ratings are similar when the stimulus is small or big.
+*Hypothesis 8 (SIZE EFFECT ON CONFIDENCE IN PRESENCE)*: We tested the null hypothesis that post-decisional target-present confidence ratings are similar when the stimulus is small or big.
 
 We performed a paired t-test on the following individual-level contrast from correct trials: $mean(confidence_{P, big}) - mean(confidence)_{P, small}$ where P stands for present.
 
-This revealed a significant difference in confidence ratings for big and small stimuli in target-present responses (`r apa_print(conf_size_present%>%pull(conf_size_present)%>%t.test())$full_result`), with higher confidence ratings for small stimuli.
+This revealed no difference in confidence ratings for big and small stimuli in target-present responses (`r apa_print(conf_size_present%>%pull(conf_size_present)%>%t.test())$full_result`), with higher confidence ratings for small stimuli.
 
 ```{r H9, echo=FALSE, cache=TRUE}
-conf_size_absent <- size.df %>%
-    dplyr::filter(present == 0 & correct == TRUE) %>%
+conf_size_absent <- prospective.df %>%
+    dplyr::filter(present == 0 & correct == TRUE & confidence_time == "after") %>%
     dplyr::group_by(subj_id, size) %>%
     dplyr::summarise(confidence = mean(confidence)) %>%
     tidyr::pivot_wider(names_from = size, values_from = confidence) %>%
     dplyr::mutate(conf_size_absent = big-small)
 ```
 
-*Hypothesis 9 (SIZE EFFECT ON CONFIDENCE IN ABSENCE)*: We tested the null hypothesis that target-absent confidence ratings are similar when the stimulus is small or big.
+*Hypothesis 9 (SIZE EFFECT ON CONFIDENCE IN ABSENCE)*: We tested the null hypothesis that post-decisional target-absent confidence ratings are similar when the stimulus is small or big.
 
 We performed a paired t-test on the following individual-level contrast from correct trials: $mean(confidence_{A, big}) - mean(confidence)_{A, small}$ where A stands for absent.
 
@@ -223,6 +215,78 @@ We performed a group-level t-test on a subject-level contrast in correct trials 
 
 This revealed a significant interaction effect between stimulus size and target presence on subjective confidence levels (`r apa_print(conf_size_resp%>%pull(conf_size_resp)%>%t.test())$full_result`).
 
+```{r H11, echo=FALSE, cache=TRUE}
+pros_conf <- prospective.df %>%
+  dplyr::filter(correct==TRUE & confidence_time == "before") %>%
+  dplyr::group_by(subj_id, size) %>%
+  dplyr::summarise(confidence = mean(confidence)) %>%
+  tidyr::pivot_wider(names_from = size, values_from = confidence) %>%
+  dplyr::mutate(pros_conf = `big` - `small`)
+t.test(pros_conf$pros_conf)
+```
+
+*Hypothesis 11 (SIZE EFFECT ON PROSPECTIVE CONFIDENCE)*: We tested the null hypothesis that prospective confidence ratings are similar when the stimulus is expected to be small or big.
+This was tested using a paired t-test on the mean individual-level confidence ratings from correct trials only.
+
+We performed a paired t-test on the following individual-level contrast from correct trials: $mean(confidence_{prospective, big}) - mean(confidence)_{prospective, small}$.
+
+This revealed a significant effect of stimulus size on prospective confidence ratings (`r apa_print(pros_conf%>%pull(pros_conf)%>%t.test())$full_result`), with higher confidence ratings for big stimuli.
+
+```{r H12, echo=FALSE, cache=TRUE}
+diff_wide <- pros_conf %>%
+  dplyr::select(subj_id,pros_conf) %>%
+  merge(conf_size_present %>%
+          dplyr::select(subj_id,conf_size_present)) %>%
+  merge(conf_size_absent %>%
+          dplyr::select(conf_size_absent)) %>%
+  merge(RT_size_present %>%
+          dplyr::select(subj_id,RT_size_present)) %>%
+  merge(RT_size_absent %>%
+          dplyr::select(subj_id, RT_size_absent)) 
+
+cor_pros_absent <- cor.test(diff_wide$pros_conf, diff_wide$conf_size_absent, method = "pearson")
+
+```
+
+*Hypothesis 12 (SIZE EFFECT CORRELATION: PROSPECTIVE AND ABSENCE)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is uncorrelated with the effect of stimulus size on post-decisional confidence in absence. The two effects were uncorrelated across participants (`r apa_print(cor_pros_absent)$full_result`)
+
+```{r H13, echo=FALSE, cache=TRUE}
+cor_pros_present <- cor.test(diff_wide$pros_conf, diff_wide$conf_size_present, method = "pearson")
+```
+
+*Hypothesis 13 (SIZE EFFECT CORRELATION: PROSPECTIVE AND PRESENCE)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is uncorrelated with the effect of stimulus size on post-decisional confidence in presence. The two effects were uncorrelated across participants (`r apa_print(cor_pros_present)$full_result`)
+
+
+```{r H14, echo=FALSE, cache=TRUE}
+cor_pres_abs <- cor.test(diff_wide$conf_size_present, diff_wide$conf_size_absent, method = "pearson")
+included_N <- diff_wide$subj_id%>%unique()%>%length()
+steiger = r.test(included_N,cor_pros_absent$estimate,cor_pros_present$estimate,cor_pres_abs$estimate)
+
+```
+
+*Hypothesis 14 (DIFFERENCE IN CORRELATIONS)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is similarly correlated with the effect of stimulus size on post-decisional confidence in presence and in absence.
+This was tested with a Steiger’s t-test for dependent correlations [@@steiger_tests_1980], giving rise to a non-significant ($t=$`r printnum(steiger$t)`, $p$ `r print_p(steiger$p, add_equals=T)`).
+
+```{r H15, echo=FALSE, cache=TRUE}
+cor_pros_rtabsent <- cor.test(diff_wide$pros_conf, diff_wide$RT_size_absent, method = "pearson")
+```
+
+*Hypothesis 15 (SIZE EFFECT CORRELATION: PROSPECTIVE CONFIDENCE AND ABSENCE RT)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is uncorrelated with the effect of stimulus size on target-absent response times in post-decisional confidence trials. The two were uncorrelated (`r apa_print(cor_pros_rtabsent)$full_result`)
+
+```{r H16, echo=FALSE, cache=TRUE}
+cor_pros_rtpresent <- cor.test(diff_wide$pros_conf, diff_wide$RT_size_present, method = "pearson")
+```
+
+*Hypothesis 15 (SIZE EFFECT CORRELATION: PROSPECTIVE CONFIDENCE AND PRESENCE RT)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is uncorrelated with the effect of stimulus size on target-present response times in post-decisional confidence trials. The two were uncorrelated (`r apa_print(cor_pros_rtpresent)$full_result`)
+
+```{r H17, echo=FALSE, cache=TRUE}
+cor_rtpres_rtabs <- cor.test(diff_wide$RT_size_present, diff_wide$RT_size_absent, method = "pearson")
+steiger_RT <- r.test(included_N,cor_pros_rtabsent$estimate,cor_pros_rtpresent$estimate,cor_rtpres_rtabs$estimate) 
+
+```
+
+*Hypothesis 17 (DIFFERENCE IN CORRELATIONS)*: We tested the null hypothesis that the effect of stimulus size on prospective confidence is similarly correlated with the effect of stimulus size on RT in presence and in absence.
+This was tested with a Steiger’s t-test for dependent correlations [@@steiger_tests_1980], giving rise to a non-significant ($t=$`r printnum(steiger_RT$t)`, $p$ `r print_p(steiger_RT$p, add_equals=T)`).
 \newpage
 
 ## References
