@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Noisy letters v. 3.0</title>
+    <script src="jspsych/jspsych.js"></script>
+    <script src="p5/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script src="jspsych/plugin-fullscreen.js"></script>
+    <script src="jspsych/plugin-preload.js"></script>
+    <script src="jspsych/plugin-instructions.js"></script>
+    <script src="jspsych/plugin-noisy-letter-confidence.js"></script>
+    <script src="jspsych/plugin-noisy-letter-prospective-confidence.js"></script>
+    <script src="jspsych/plugin-html-keyboard-response.js"></script>
+    <script src="jspsych/plugin-image-keyboard-response.js"></script>
+    <script src="jspsych/plugin-survey-text.js"></script>
+    <script src="jspsych/plugin-survey-multi-choice.js"></script>
+    <script src="jspsych/plugin-external-html.js"></script>
+    <script src="jspsych/plugin-test.js"></script>
+    <script src="jatos.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Corben&family=Quicksand&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <link href="style.css" rel="stylesheet" type="text/css"></link>
+
+  </head>
+  <body></body>
+  <script>  
+
+    const jsPsych = initJsPsych({
+    on_finish: function() {
+
+        jsPsych.data.addProperties(
+          jatos.urlQueryParameters);
+          jsPsych.data.addProperties(
+          { first_target: window.first_target,
+            second_target: window.second_target,
+            practice_first_letter_loops: window.practice1_loops,
+            practice_second_letter_loops: window.practice2_loops,
+            prospective_comprehension_visits: window.prospective_comprehension_visits,
+            confidence_comprehension_visits: window.confidence_comprehension_visits,
+            comprehension: true,
+            presence_key:window.choices[1] }
+          ); 
+          var resultJson = jsPsych.data.get().json();
+          var resultCsv = jsPsych.data.get().csv(); // var resultCsv = jsPsych.data.get().ignore('presented_pixel_data').csv();
+        jatos.catchAndLogErrors()
+        jatos.submitResultData(resultCsv)
+            .then(()=>
+            jatos.uploadResultFile(resultJson, `${jatos.workerId}_data_${Date.parse(Date())}.json`))
+            .then(()=>jatos.endStudyAndRedirect(window.success_link, true, "finished"));
+    }});
+
+
+function makeTimeline() {
+
+window.choices = Math.random()>0.5? ['g','f'] : ['f','g'];
+window.first_target = Math.random()>0.5? 'A' : 'S'
+window.current_target=window.first_target;
+window.second_target = window.first_target=='A'? 'S' : 'A';
+window.practice1_loops=0;
+window.practice2_loops=0
+window.prospective_comprehension_visits=0;
+window.confidence_comprehension_visits=0;
+window.n_repetitions = 2;
+window.max_p = 0.3;
+
+window.followed_confidence = false;
+window.comprehension_visits = 0;
+
+
+timeline = [];
+
+
+timeline.push({
+  type: jsPsychFullscreen,
+  fullscreen_mode: true,
+  message: `<p>The experiment will switch to full screen mode when you press the button below. Please do not exit the full screen mode until the end of the experiment.</p>`
+});
+
+var format_instructions = (s) => {return(s+'<footer>Use the right arrow key on your keyboard to navigate to the next screen.</footer>')};
+
+// PRACTICE ROUND
+var instructions = {
+    type: jsPsychInstructions,
+    pages: function() {return [
+    format_instructions(`<h1>Welcome!</h1>
+    <p>In this experiment, we will show you some noisy images and then ask you to make judgments about them. The experiment consists of four parts, and should take about 15 minutes total to complete.</p>`),
+    format_instructions(`<p>Each time, we will show you a pattern of gray squares. We call this 'noise', because the position and color of the squares are random.</p>
+    <p>Sometimes, the noise will contain the letter <b>${window.current_target}</b>, and sometimes it won't.</p>`),
+    format_instructions(`<p>Put the middle and index fingers of your left hand on the F and G keys on your keyboard.</p>
+    <p>Now, pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained the letter <b>${window.first_target}</b>, and '${window.choices[0].toUpperCase()}' if not.</p><p>Let's start with four practice trials.</p>
+    <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`)
+    ]},
+    show_clickable_nav: false
+};
+timeline.push(instructions);
+
+var fixation = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: '<div style="font-size:60px;">+</div>',
+  choices: "NO_KEYS",
+  trial_duration: ()=>{return(500+Math.random()*500)},
+  func: function() {
+      document.body.style.cursor= "none";
+  }
+};
+
+var practice_letters = {
+  type: jsNoisyLetter,
+  choices: window.choices,
+  max_p: 0.35,
+  present: jsPsych.timelineVariable('present'),
+  data: jsPsych.timelineVariable('data'),
+  image: ()=>{return(`img/${window.current_target}.png`)},
+  pixel_size_factor: jsPsych.timelineVariable('pixel_size_factor'),
+  rate_confidence: jsPsych.timelineVariable('rate_confidence'),
+  on_finish: function(data){
+    data.correct = data.response == data.correct_response;
+    data.target=window.current_target
+  }
+};
+
+var practice_stimuli = [
+  { present:1, rate_confidence: false, pixel_size_factor: 4,
+      data: { test_part: 'practice', present: 1, correct_response: window.choices[1], pixel_size_factor: 4 }},
+  { present:0,rate_confidence: false, pixel_size_factor: 4,
+      data: { test_part: 'practice', present: 0, correct_response: window.choices[0], pixel_size_factor: 4 }}
+];
+
+var practice_feedback = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function(){
+    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+    var last_trial_present = jsPsych.data.get().last(1).values()[0].present;
+
+    if(last_trial_correct & last_trial_present){
+      return "<div style=\"width:300px;height:56px;font-size:30px;text-align:center;\">Correct! You detected the letter.</div>";
+    } else if(!last_trial_correct & last_trial_present) {
+      return "<div style=\"width:300px;height:56px;border:0px;font-size:30px;text-align:center\">Wrong. You missed the letter.</div>"
+    } else if(last_trial_correct & !last_trial_present) {
+      return "<div style=\"width:300px;height:56px;border:0px;font-size:30px;text-align:center\">Correct! This was just noise.</div>"
+    } else if(!last_trial_correct & !last_trial_present) {
+      return "<div style=\"width:300px;height:56px;border:0px;font-size:30px;text-align:center\">Wrong. This was just noise.</div>"
+    }
+  },
+  trial_duration: function(){
+    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+    if(last_trial_correct){
+      return 1500;
+    } else {
+      return 3000
+    }
+  },
+  response_ends_trial: false,
+  func: function() {
+      document.body.style.cursor= "none";
+  }
+}
+
+var practice_block = {
+  timeline: [fixation, practice_letters, practice_feedback],
+  timeline_variables: practice_stimuli,
+  repetitions: 2,
+  randomize_order: true
+};
+
+var explain_again = {
+  type: jsPsychInstructions,
+  title: 'Let\'s try again',
+  pages: function() {
+     var trials = jsPsych.data.get().last(12).filter({test_part: 'practice'});
+     var num_correct = trials.filter({correct: true}).count();
+  return [format_instructions(`<h1>Let's try again</h1>
+  <p>You got ${num_correct} responses right out of 4. Let's try again. Your task is to decide
+  whether the letter <b>${window.current_target}</b> appeared in the noise or not. press ${window.choices[1].toUpperCase()} for yes, and ${window.choices[0].toUpperCase()} for no.</p>
+  <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`)]
+  },
+  show_clickable_nav: false
+};
+
+var practice_loop_node = {
+    timeline: [
+      {timeline: [explain_again], conditional_function: function() {return window.practice1_loops>0}}, 
+      practice_block
+    ],
+    loop_function: function(data){
+        // get the data from the previous trial,
+        // and check which key was pressed
+        var num_correct = data.filter({correct: true}).count();
+        if(num_correct>2){
+            return false;
+        } else {
+           window.practice1_loops++
+           return true;
+        }
+    }
+}
+
+timeline.push(practice_loop_node)
+
+// PRACTICE CONFIDENCE 
+var instructions_prospective_conf = {
+type: jsPsychInstructions,
+pages: ()=>{return [
+  format_instructions(`<p>Additionally, before you see the noise, you will <b>rate how confident you are</b> in that you can tell whether the letter <b>${window.first_target}</b> is in the frame or not.</p> 
+    <p>You will do this by controlling the position of a dial on a scale: the more confident you are in that you will be able to tell what is in the noise, the higher you should place the dial before clicking.</p>
+    <p>Only then will you see the noise, and decide whether the letter <b>${window.current_target}</b> was in it or not.</p>`),
+  format_instructions(`<p>Let's practice rating your confidence <b>before</b> making a decision.</p>`)
+]},
+show_clickable_nav: false
+};
+timeline.push(instructions_prospective_conf);
+
+var practice_prospective_letters = {
+  type: jsNoisyLetterProspective,
+  choices: window.choices,
+  max_p: 0.35,
+  present: jsPsych.timelineVariable('present'),
+  data: jsPsych.timelineVariable('data'),
+  image: ()=>{return(`img/${window.current_target}.png`)},
+  pixel_size_factor: jsPsych.timelineVariable('pixel_size_factor'),
+  on_finish: function(data){
+    data.correct = data.response == data.correct_response;
+    data.target = window.current_target;
+  }
+};
+
+var practice_conf_stimuli = [
+{ present:1, rate_confidence: true, pixel_size_factor: 4,
+      data: { test_part: 'practice', present: 1, correct_response: window.choices[1], pixel_size_factor: 4 }},
+{ present:0,rate_confidence: true, pixel_size_factor: 4,
+      data: { test_part: 'practice', present: 0, correct_response: window.choices[0], pixel_size_factor: 4 }}
+];
+
+var practice_prospective_conf_block = {
+timeline: [fixation, practice_prospective_letters, practice_feedback], 
+timeline_variables: practice_conf_stimuli,
+repetitions: 2,
+randomize_order: true
+};
+
+var multichoice_prospective_confidence = {
+type: jsPsychSurveyMultiChoice,
+questions: [{
+prompt: `If I dragged the dial to the top of the scale, it means that I am:`,
+options: ['1. very confident that I will be correct in the decision that I am about to make.',
+          '2. very confident that I was correct in the decision that I just made.',
+          '3. not at all confident that I will be correct in the decision that I am about to make.',
+          '4. not at all confident that I was correct in the decision that I just made.'],
+name: 'multichoice_prospective_confidence',
+required: true
+}],
+on_finish: function(data){
+  window.followed_prospective_confidence = data.response.multichoice_prospective_confidence[0]=='1';
+  window.prospective_comprehension_visits++
+}
+};
+
+var explain_again_prospective_conf = {
+type: jsPsychInstructions,
+title: 'Let\'s try again',
+pages: function() {
+return [format_instructions(`<h1>Let's try again</h1>
+<p>Your response to the comprehension question was incorrect. Let's try again. 
+  In this block, your task is to rate your confidence in that you will be correct in the decision you are about to make. 
+  The more confident you are, the higher you should place the dial before clicking.</p>`)]
+},
+show_clickable_nav: false
+};
+
+var practice_prospective_conf_loop_node = {
+  timeline: [
+    {timeline: [explain_again_prospective_conf], conditional_function: function() {return window.prospective_comprehension_visits>0}},
+    {timeline: [practice_prospective_conf_block], conditional_function: function() {return window.prospective_comprehension_visits==0}},
+    {timeline: [multichoice_prospective_confidence]}
+  ],
+   loop_function: function(data){
+       if(window.followed_prospective_confidence || window.prospective_comprehension_visits>1){
+           return false;
+       } else {
+          return true;
+       }
+   }
+}
+timeline.push(practice_prospective_conf_loop_node);
+
+
+
+
+// INSTRUCTIONS FIRST BLOCK 
+var instructions2 = {
+   type: jsPsychInstructions,
+   pages: function() {
+    
+    if (!window.followed_prospective_confidence) {
+      return [format_instructions(`<p>You failed the comprehension check twice, and will now be redirected back to Prolific. Please return your submission.</p>`)]}
+      else {
+        return  [
+   format_instructions(`<p>Now we are ready for the actual experiment.</p>
+   <p>This time, your task is exactly the same, but the display may appear either bigger or smaller than before.</p><p>When rating your confidence before making a decision, the size of the display will be indicated by the size of the black frame.</p>`), 
+   format_instructions(`<p>Just like before, rate your confidence and then pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained the letter <b>${window.first_target}</b>, and '${window.choices[0].toUpperCase()}' if not.</p>
+   <p>We will repeat this 8 times.</p> 
+   <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`),
+   ]}},
+   show_clickable_nav: false,
+   on_finish: function() {
+    if (!window.followed_prospective_confidence) {
+          jatos.endStudyAndRedirect(window.failed_prospective_twice_link, true, "failed_prospective_twice");
+    }
+   }
+};
+timeline.push(instructions2);
+
+var prospective_letters = {
+  type: jsNoisyLetterProspective,
+  choices: window.choices,
+  image: ()=>{return(`img/${window.current_target}.png`)},
+  pixel_size_factor: jsPsych.timelineVariable('pixel_size_factor'),
+  max_p: ()=>{return(window.max_p)},
+  present:jsPsych.timelineVariable('present'),
+  on_finish: function(data){
+    data.correct = data.response == data.correct_response;
+    data.target=window.current_target
+  },
+  data: jsPsych.timelineVariable('data')
+};
+
+var feedback = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function(){
+    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+    if(last_trial_correct){
+      return "<div style=\"width:150px;height:56px;font-size:30px;text-align:center;\">correct!</div>";
+    } else {
+      return "<div style=\"width:150px;height:56px;border:0px;font-size:30px;text-align:center\">wrong.</div>"
+    }
+  },
+  trial_duration: function(){
+    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+    if(last_trial_correct){
+      return 1000;
+    } else {
+      return 2500
+    }
+  },
+  response_ends_trial: false,
+  func: function() {
+      document.body.style.cursor= "none";
+  }
+}
+
+var stimuli_prospective = [
+  { present: 1, pixel_size_factor: 3,
+      data: ()=>{return({ test_part: 'test1', present: 1, correct_response: window.choices[1], max_p:window.max_p, pixel_size_factor: 3, confidence_time: 'before' })}},
+  {present: 0, pixel_size_factor: 3,
+      data: ()=>{return({ test_part: 'test1', present: 0, correct_response: window.choices[0], max_p:window.max_p, pixel_size_factor: 3, confidence_time: 'before' })}},
+  {present: 1, pixel_size_factor: 5, 
+      data: ()=>{return({ test_part: 'test1', present: 1, correct_response: window.choices[1], max_p:window.max_p, pixel_size_factor: 5, confidence_time: 'before' })}},
+  {present: 0, pixel_size_factor: 5,
+      data: ()=>{return({ test_part: 'test1', present: 0, correct_response: window.choices[0], max_p:window.max_p, pixel_size_factor: 5, confidence_time: 'before' })}},
+  ];
+
+var block_prospective= {
+  timeline: [fixation, prospective_letters, feedback], 
+  timeline_variables: stimuli_prospective,  
+  repetitions: window.n_repetitions,  
+  randomize_order: true
+}
+// BLOCK 1
+timeline.push(block_prospective);
+
+
+// BLOCK 2
+
+
+var instructions3= {
+   type: jsPsychInstructions,
+  on_finish: function() {
+    console.log("on_finish called");
+    console.log("window.second_target:", window.second_target);
+    window.current_target = window.second_target;
+    console.log("window.current_target:", window.current_target);
+  },
+   pages: [
+   format_instructions(`<h1>Well done on finishing part 1!</h1><p>Ready to start part 2 out of 4?</p>
+   <p>Just like in part 1, you will rate your confidence, and then pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained a letter, and '${window.choices[0].toUpperCase()}' if not.</p>`),
+   format_instructions(`<h1>Letter change!</h1><p>In part 2, the noise will include the letter <b>${window.second_target}</b> on some trials but not on others. The letter <b>${window.first_target}</b> will never appear in this part.</p>`),
+   format_instructions(`<p>Let's practice detecting the letter <b>${window.second_target}</b>. </p>`)
+   ],
+   show_clickable_nav: false
+};
+timeline.push(instructions3);
+
+var explain_again2 = {
+ type: jsPsychInstructions,
+ title: 'Let\'s try again',
+ pages: function() {
+    var trials = jsPsych.data.get().last(12).filter({test_part: 'practice'});
+    var num_correct = trials.filter({correct: true}).count();
+    return [format_instructions(`<h1>Let's try again</h1>
+    <p> You got ${num_correct} responses right out of 4. Let's try again. Your task is to decide
+    whether the letter <b>${window.second_target}</b> (and not ${window.first_target} as before) appeared in the noise or not. 
+    Press ${window.choices[1].toUpperCase()} for yes, and ${window.choices[0].toUpperCase()} for no.</p>`)]
+ },
+ show_clickable_nav: false
+};
+
+var practice2_loop_node = {
+   timeline: [{timeline: [explain_again2], conditional_function: function() {return window.practice2_loops>0}}, practice_block], 
+   loop_function: function(data){
+       // get the data from the previous trial,
+       // and check which key was pressed
+       var num_correct = data.filter({correct: true}).count();
+       if(num_correct>2){
+           return false;
+       } else {
+          window.practice2_loops++
+          return true;
+       }
+   }
+}
+
+timeline.push(practice2_loop_node);
+
+var instructions4 = {
+   type: jsPsychInstructions,
+   pages: function() { return [
+   format_instructions(`<H1>Part 2</H1>
+   <p>After rating your confidence, pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained the letter <b>${window.current_target}</b>, and '${window.choices[0].toUpperCase()}' if not.</p>
+   <p>We will repeat this 8 times.</p> 
+   <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`),
+   ]},
+
+   show_clickable_nav: false,
+   on_finish: function() {
+    console.log("on_finish called");
+    console.log("window.second_target:", window.second_target);
+    window.current_target = window.second_target;
+    console.log("window.current_target:", window.current_target);
+  }
+};
+timeline.push(instructions4);
+
+timeline.push(block_prospective);
+
+timeline.push(
+  {
+   type: jsPsychInstructions,
+   pages: function() { 
+    window.current_target  = window.first_target;
+    return [
+   format_instructions(`<H1>Congratulations, you finished part 2!</H1><p>You can now take a short break before we continue to parts 3 and 4, which will have different instructions.</p>`),
+   format_instructions(`<H1>Part 3</H1> <p>Welcome to part 3! It can look similar to parts 1 and 2, but there are important differences so read the instructions carefully.</p>`),
+   format_instructions(`<p> First, in the next round, the target letter will go back to being an <b>${window.current_target}</b>.</p> <p>So in part 3, we will ask you to detect whether or not the letter <b>${window.current_target}</b> is present in the noise.</p>`),
+   format_instructions(`<p>Second, in the next two rounds, you will rate your confidence <u><b>after</b></u> you have already made your decision instead of beforehand.</p>
+<p>So, we will show you the display, ask you to decide whether or not the letter was present, and then ask you to rate your confidence in that your decision was correct. </p>`),
+format_instructions(`<p>Let's practice rating your confidence in the decision that you just made.</p>`)
+   ]},
+   show_clickable_nav: false
+  }
+)
+
+var practice_conf_block = {
+timeline: [fixation, practice_letters, practice_feedback], 
+timeline_variables: practice_conf_stimuli,
+repetitions: 2,
+randomize_order: true
+};
+
+var multichoice_confidence = {
+type: jsPsychSurveyMultiChoice,
+questions: [{
+prompt: `If I pressed ${window.choices[0].toUpperCase()} and dragged the dial to the top of the scale, it means that I am:`,
+options: ()=>{return [`1. very confident that there was an <b>${window.current_target}</b> in the noise.`,
+          `2. very confident that there was no <b>${window.current_target}</b> in the noise.`,
+          '3. very confident in the decision I am about to make.',
+          `4. was only guessing that there was an <b>${window.current_target}</b> in the noise.`,
+          `5. was only guessing that there was no a <b>${window.current_target}</b> in the noise.`,
+          `6. not at all confident that I will be correct in my next decision.`]},
+name: 'multichoice_confidence',
+required: true
+}],
+on_finish: function(data){
+  window.followed_confidence = data.response.multichoice_confidence[0]=='2';
+  window.confidence_comprehension_visits++
+}
+};
+
+var explain_again_conf = {
+type: jsPsychInstructions,
+title: 'Let\'s try again',
+pages: function() {
+return [format_instructions(`<h1>Let's try again</h1>
+<p>Your response to the comprehension question was incorrect. Let's try again. 
+  From now on, your task is to rate your confidence in your decision about whether the letter <b>${window.current_target}</b> appeared in the noise or not, <u>after</u> making the decision. 
+  The more confident you are that you were correct, the higher you should place the dial before clicking.</p>`)]
+},
+show_clickable_nav: false
+};
+
+var practice_conf_loop_node = {
+  timeline: [
+    {timeline: [explain_again_conf], conditional_function: function() {return window.confidence_comprehension_visits>0}},
+    {timeline: [practice_conf_block], conditional_function: function() {return window.confidence_comprehension_visits==0}},
+    {timeline: [multichoice_confidence]}
+  ],
+   loop_function: function(data){
+       if(window.followed_confidence || window.confidence_comprehension_visits>1){
+           return false;
+       } else {
+          return true;
+       }
+   }
+}
+timeline.push(practice_conf_loop_node);
+
+var instructions4 = {
+   type: jsPsychInstructions,
+   pages: function() { 
+    if (!window.followed_confidence) {
+      return [format_instructions(`<p>You failed the comprehension check twice, and will now be redirected back to Prolific. Please return your submission.</p>`)]
+    } else {
+      return [
+   format_instructions(`<p>Let's start part 3.</p> 
+   <p>Your task is to focus on the noise, and determine whether the letter <b>${window.current_target}</b> appeared in it or not.</p>`),
+   format_instructions(`<p>Just like before, pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained the letter <b>${window.current_target}</b>, and '${window.choices[0].toUpperCase()}' if not.</p>
+   <p>Only after you make your decision, you will rate your confidence in that you were correct using the scale.</p>
+   <p>We will repeat this 8 times.</p> 
+   <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`),
+   ]}},
+
+   show_clickable_nav: false,
+   on_finish: function() {
+    if (!window.followed_confidence) {
+          jatos.endStudyAndRedirect(window.failed_confidence_twice_link, true, "failed_confidence_twice");
+    }
+  }
+};
+timeline.push(instructions4);
+
+var letters = {
+  type: jsNoisyLetter,
+  choices: window.choices,
+  image: ()=>{return(`img/${window.current_target}.png`)},
+  rate_confidence: jsPsych.timelineVariable('rate_confidence'),
+  pixel_size_factor: jsPsych.timelineVariable('pixel_size_factor'),
+  max_p: ()=>{return(window.max_p)},
+  present:jsPsych.timelineVariable('present'),
+  on_finish: function(data){
+    data.correct = data.response == data.correct_response;
+    data.target = window.current_target;
+  },
+  data: jsPsych.timelineVariable('data')
+};
+
+var stimuli_post = [
+  {present: 1, rate_confidence: true, pixel_size_factor: 3,
+      data: ()=>{return({ test_part: 'test1', present: 1, correct_response: window.choices[1], max_p:window.max_p, pixel_size_factor: 3, confidence_time: 'after' })}},
+  {present: 0, rate_confidence: true, pixel_size_factor: 3,
+      data: ()=>{return({ test_part: 'test1', present: 0, correct_response: window.choices[0], max_p:window.max_p, pixel_size_factor: 3, confidence_time: 'after' })}},
+  {present: 1, rate_confidence: true, pixel_size_factor: 5, 
+      data: ()=>{return({ test_part: 'test1', present: 1, correct_response: window.choices[1], max_p:window.max_p, pixel_size_factor: 5, confidence_time: 'after' })}},
+  {present: 0, rate_confidence: true, pixel_size_factor: 5,
+      data: ()=>{return({ test_part: 'test1', present: 0, correct_response: window.choices[0], max_p:window.max_p, pixel_size_factor: 5, confidence_time: 'after' })}},
+  ];
+
+
+
+var block_post = {
+  timeline: [fixation, letters, feedback], 
+  timeline_variables: stimuli_post,  
+  repetitions: window.n_repetitions,  
+  randomize_order: true
+}
+// BLOCK 3
+timeline.push(block_post);
+
+timeline.push({
+   type: jsPsychInstructions,
+   pages: ()=>{
+    window.current_target=window.second_target;
+    return [
+   format_instructions(`<h1>Great work! Ready to start part 4?</h1> <p>This is the last round in this experiment.</p>`),
+   format_instructions(`<p>Just like before, pay close attention and press '${window.choices[1].toUpperCase()}' if the noise contained the letter and '${window.choices[0].toUpperCase()}' if not.</p>
+   <p>Only after you make your decision, you will rate your confidence using the scale.</p>`),
+   format_instructions(`<h1>Letter change!</h1><p>From now on, the noise will include the letter <b>${window.second_target}</b> on some trials but not on others. The letter <b>${window.first_target}</b> will never appear.</p>`),
+   format_instructions(`<p>In this last round you will make 8 decisions.</p> 
+   <p><img src='img/keyboard_${window.choices[0]+window.choices[1]}.png'></p>`),
+   ]},
+   show_clickable_nav: false
+});
+
+// BLOCK 4
+timeline.push(block_post);
+
+
+var which_was_harder_size = {
+type: jsPsychSurveyMultiChoice,
+questions: [
+  {
+    prompt: `<h1>One final question.</h1>
+    <p>Sometimes the display would appear smaller, and sometimes bigger. Did you feel this had any effect on how difficult it was to spot the letter?</p>`,
+    name: 'which_was_harder',
+    options: ['Yes! It was harder when the display was smaller.',
+    'Yes! It was harder when the display was bigger.',
+    'No! The size of the display no effect on how difficult it was to spot the letter.'],
+    required: true
+  }],
+};
+timeline.push(which_was_harder_size);
+
+var worker_comments = {
+type: jsPsychSurveyText,
+preamble: '<h1>Your Thoughts<h1>',
+questions: [{
+prompt: `We would appreciate if you could share any thoughts you had about the experiment, or anything we should take into account when analyzing your data.`,
+pleaceholder: "your comments here",
+rows:8,
+columns:60,
+name: 'worker_comments'
+}]
+}
+timeline.push(worker_comments);
+
+var Thank_you = {
+  type: jsPsychInstructions,
+  pages: [
+  `<h1>Thank you!</h1>
+  <p>Your contribution will help us to better understand how what we believe affects what we perceive.</p>
+  <p>Please press the right arrow to end the experiment. <b>Please be patient -- it could take up to 5 minutes before we can save your data and you are redirected to Prolific.</b></p>`
+  ],
+  show_clickable_nav: false
+};
+
+timeline.push(Thank_you);
+return timeline
+}
+
+
+function hexToBytes(hex) {
+      for (var bytes = [], c = 0; c < hex.length; c += 2)
+      bytes.push(parseInt(hex.substr(c, 2), 16));
+      return bytes;
+    };
+
+timeline=makeTimeline();
+jsPsych.run(timeline);
+
+
+  </script>
+</html>
