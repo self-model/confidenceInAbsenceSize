@@ -17,7 +17,7 @@ Raw behavioural data from Exp. 2 is also available [on OSF](https://osf.io/fhn7v
 These files can be downloaded into their right places by running [`downloadFromOSF.R`](https://github.com/self-model/confidenceInAbsenceSize/blob/main/analysis/downloadFromOSF.R) from the analysis subdirectory.
 
 ## Analysis Scripts
-A fully reproducible data-to-results-section code (in R and Rmarkdown), is available in the ['analysis'](https://github.com/self-model/confidenceInAbsenceSize/blob/main/analysis/results.Rmd) subdirectory. 
+A fully reproducible data-to-results-section code, (in R and Rmarkdown), is available in the analysis subdirectory. The directory also includes all pre-registered hypotheses from the two experiments. 
 
 ## Experiment demos
 
